@@ -1472,7 +1472,6 @@ namespace aspect
       sim->initialize_simulator (this->get_simulator());
       property_manager->parse_parameters(prm);
       property_manager->initialize();
-      property_manager->post_initialize();
 
       // Create an integrator object depending on the specified parameter
       integrator.reset(Integrator::create_particle_integrator<dim> (prm));
