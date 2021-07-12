@@ -81,6 +81,8 @@ namespace aspect
       public:
         AnisotropicViscosity(const unsigned int n_points);
 
+        double compute_second_invariant(const SymmetricTensor<2,dim> strain_rate, const double min_strain_rate) const;
+
         virtual std::vector<double> get_nth_output(const unsigned int idx) const;
 
         /**
@@ -563,19 +565,26 @@ namespace aspect
       SymmetricTensor<2,3>
       Stress_strain_aggregate(material_model_inputs.strain_rate,euler,material_model_inputs.temperature,grain_size)
       {
+        /*%Micromechanical model for olivine deformation by Hansen et al., (2016,
+        %JGR) using a pseudo-Taylor method, assuming that each grain experiences
+        %the same strain rate. It results in the best fitting stress in MPa.*/
+
         double nFo = 4.1;
         float A0 = 1.1e5*exp(-530000/8.314/material_model_inputs.temperature);
-        const FullMatrix<int> Schm(6,3); //Schmid tensor, 6x3 matrix
-        const FullMatrix<int> pinvschm(3,6); //pseudoinverse of Schmid tensor, 3x6 matrix
+        const Tensor<6,3> Schm; //Schmid tensor, 6x3 matrix
+        const Tensor<3,6> pinvschm; //pseudoinverse of Schmid tensor, 3x6 matrix
         Tensor<3,1, double> A_ss; //A_ss is the invers of the minimum resolved stress on the slip systems on the nth power
         A_ss(0) = 67.620068827798290;
         A_ss(1) = 97.774775049471710;
         A_ss(2) = 0.410143670706667;
-        Schm = 0;
-        Schm(4,3) = 1;
-        Schm(5,2) = 1;
-        Schm(6,1) = 1; //Is there an easier way to define this 6x3 and the following 3x6 matrices?
-        pinvschm = 0;
+        Schm [4][3] = 1;
+        Schm[5][2] = 1;
+        Schm[6][1] = 1; //Is there an easier way to define this 6x3 and the following 3x6 matrices?
+        for (int i = 0; i < 3; i++) {
+          for (int j = 0; j < 6; i++) {
+            pinvschm[i][j] = 0;
+          }
+        }
         pinvschm(1,6) = 1;
         pinvschm(2,5) = 1;
         pinvschm(3,4) = 1;
@@ -584,10 +593,11 @@ namespace aspect
           SymmetricTensor<2,3> Rate_grain=R*material_model_inputs.strain_rate*Transpose(R);
           const std::array<std::pair<double,Tensor<1,3,double> >, 3> Rate_grain_eig = eigenvectors(Rate_grain, SymmetricTensorEigenvectorMethod::jacobi);
 		      double inv2=pow(Rate_grain_eig(0)-Rate_grain_eig(1),2)+pow(Rate_grain_eig(1)-Rate_grain_eig(2),2)+pow(Rate_grain_eig(0)-Rate_grain_eig(2),2);
-          Tensor<6,1, double> Rate_grain_voigt = { Rate_grain(0,0), Rate_grain(1,1), Rate_grain(2,2), 2*Rate_grain(1,2), 2*Rate_grain(0,2), 2*Rate_grain(0,1)};
+          auto Rate_grain_voigt = AnisotropicViscosity<dim>::transform_Symmetric3x3_matrix_to_6D_vector(Rate_grain);
+          
           Tensor<3,1, double> r_ss = pinvschm * Rate_grain_voigt;
           Tensor<6,1, double> r_gc_v = Schm * r_ss;
-          SymmetricTensor<2,3> r_gc << r_gc_v(0),r_gc_v(5)/2,r_gc_v(4)/2,r_gc_v(5)/2,r_gc_v(1),r_gc_v(3)/2,r_gc_v(4)/2,r_gc_v(3)/2,r_gc_v(2);
+          auto r_gc = transform_6D_vector_to_Symmetric3x3_matrix(r_gc_v);
 		      const std::array<std::pair<double,Tensor<1,3,double> >, 3> r_gc_eig = eigenvectors(r_gc, SymmetricTensorEigenvectorMethod::jacobi);
 		      double inv2best=pow(r_gc_eig(0)-r_gc_eig(1),2)+pow(r_gc_eig(1)-r_gc_eig(2),2)+pow(r_gc_eig(0)-r_gc_eig(2),2);
 		      r_ss=r_ss*pow(inv2/inv2best,0);
@@ -597,16 +607,60 @@ namespace aspect
 		      tau_ss(2)= copysign(1,r_ss(2))*pow(1/A_ss(2)*1/A0*pow(grain_size,0.73)*abs(r_ss(2)/2),1/nFo);
 		      Tensor<6,1, double> S_gc_v=Schm*tau_ss; //Voigt notation of the resolved stress on the grain
 		      SymmetricTensor<2,3> S_gc;
-	    	  S_gc << S_gc_v(0),S_gc_v(5),S_gc_v(4),S_gc_v(5),S_gc_v(1),S_gc_v(3),S_gc_v(4),S_gc_v(3),S_gc_v(2);
+	    	  auto S_gc = transform_6D_vector_to_Symmetric3x3_matrix(S_gc_v);
 		      SymmetricTensor<2,3> S_g=Rt*S_gc*R; //Here instead of making a multidimensional array what I sum at the end, I create S_g and add it to S_sum
 		      S_sum += S_g; 
         }//end loop  for number of grains
+        S_sum *= 10^6; //convert from MPa to Pa
 
         return S_sum;
       }
     }
-    
+   namespace MaterialModel
+  {
+    template <int dim> //Where do I have to declare this function?
+    double
+    AnisotropicViscosity<dim>::
+    compute_second_invariant(const SymmetricTensor<2,dim> strain_rate, const double min_strain_rate) const
+    {
+      const double edot_ii_strict = std::sqrt(strain_rate*strain_rate);
+      const double edot_ii = std::max(edot_ii_strict, min_strain_rate);
+      return edot_ii;
+    } //Can I generalize it to be able to use for both strain rate and deviatoric stress?
 
+    template<int dim> //Where do I have to declare this function?
+    Tensor<1,6>
+    AnisotropicViscosity<dim>::transform_Symmetric3x3_matrix_to_6D_vector(const SymmetricTensor<2,3> &input) 
+    {
+      return Tensor<1,6,double> (
+      {
+        input[0][0],           // 0  // 1
+        input[1][1],           // 1  // 2
+        input[2][2],           // 2  // 3
+        sqrt(2)*input[1][2],   // 3  // 4
+        sqrt(2)*input[0][2],   // 4  // 5
+        sqrt(2)*input[0][1],   // 5  // 6
+      });
+    }
+
+    template<int dim> //Where do I have to declare this function?
+    SymmetricTensor<2,3>
+    AnisotropicViscosity<dim>::transform_6D_vector_to_Symmetric3x3_matrix(const Tensor<1,6> &input) 
+    {
+      SymmetricTensor<2,3> result;
+
+      const double sqrt_2_inv = 1/sqrt(2);
+
+      result[0][0] = input[0];
+      result[1][1] = input[1];
+      result[2][2] = input[2];
+      result[1][2] = sqrt_2_inv * input[3];
+      result[0][2] = sqrt_2_inv * input[4];
+      result[0][1] = sqrt_2_inv * input[5];
+
+      return result;
+
+    }
 
     template <int dim> //this is what I have to change first!
     void
@@ -622,19 +676,13 @@ namespace aspect
                   ExcMessage("AV material model only works if there is a compositional field called euler2 (second euler angle)."));
       AssertThrow(this->introspection().compositional_name_exists("euler3"),
                   ExcMessage("AV material model only works if there is a compositional field called euler3 (third euler angle)."));
-      if (dim == 3)
-        AssertThrow(this->introspection().compositional_name_exists("nk"),
-                    ExcMessage("AV material model only works if there is a compositional field called nk."));
 
-      const unsigned int c_idx_gamma = this->introspection().compositional_index_for_name("gamma");
+      std::vector<unsigned int> c_idx_euler;
+      c_idx_euler.push_back (this->introspection().compositional_index_for_name("euler1"));
+      c_idx_euler.push_back (this->introspection().compositional_index_for_name("euler2"));
+      c_idx_euler.push_back (this->introspection().compositional_index_for_name("euler3"));
 
-      std::vector<unsigned int> c_idx_n;
-      c_idx_n.push_back (this->introspection().compositional_index_for_name("ni"));
-      c_idx_n.push_back (this->introspection().compositional_index_for_name("nj"));
-      if (dim == 3)
-        c_idx_n.push_back (this->introspection().compositional_index_for_name("nk"));
-
-      // Get the grad_u tensor, at the center of this cell, if possible.
+      // Get the grad_u tensor, at the center of this cell, if possible. DO I NEED THIS? I NEED THE CURRENT STRAIN RATE
 
       std::vector<Tensor<2,dim> > velocity_gradients (in.n_evaluation_points());
       if (in.current_cell.state() == IteratorState::valid)
@@ -657,7 +705,7 @@ namespace aspect
       for (unsigned int q=0; q<in.n_evaluation_points(); ++q)
         {
           out.densities[q] = (in.composition[q][c_idx_gamma] > 0.8 ? 1 : 0);
-          out.viscosities[q] = eta_N;
+          out.viscosities[q] = eta_N; //Should we do this once we get an "reference/isotropic viscosity" out from the viscosity tensor?
           out.thermal_expansion_coefficients[q] = 0;
           out.specific_heat[q] = 0;
           out.thermal_conductivities[q] = 0;
@@ -675,74 +723,28 @@ namespace aspect
           // necessary after the simulator has been initialized.
           if (this->simulator_is_past_initialization())
             {
-              Tensor<1,dim> n_dot;
-              if (n.norm() > 0.5 && in.composition[q][c_idx_gamma] > 0.8)
-                {
-                  // Symmetric and anti-symmetric parts of grad_u
-                  const SymmetricTensor<2,dim> D = symmetrize(velocity_gradients[q]);
-                  Tensor<2,dim> W;
-                  for (unsigned int i=0; i<dim; ++i)
-                    for (unsigned int j=0; j<dim; ++j)
-                      W[i][j] = velocity_gradients[q][i][j] - D[i][j];
+              //Second invariant of strain-rate
+              const double edot_ii = compute_second_invariant(strain_rate, min_strain_rate[c]);
+              //Define E tensor from Kiraly et al 2020 (G3) using edot_ii
+              SymmetricTensor<2,5> E_reduced;
+              E_reduced[0][0]=edot_ii;
+              E_reduced[0][1]=-edot_ii/2;
+              E_reduced[1][0]=-edot_ii/2;
+              E_reduced[1][1]=edot_ii;
+              E_reduced[2][2]=edot_ii/std::sqrt(2);
+              E_reduced[3][3]=edot_ii/std::sqrt(2);
+              E_reduced[4][4]=edot_ii/std::sqrt(2);
+              //Create fluidity tensor 
+              for (int i = 0; i < 5; i++) { 
+                SymmetricTensor<2,3> rate;
 
-                  for (unsigned int i=0; i<dim; ++i)
-                    {
-                      // outer summation over each value of j.
-                      for (unsigned int j=0; j<dim; ++j)
-                        {
-                          float Wn = W[i][j];
-                          for (unsigned int k=0; k<dim; ++k)
-                            {
-                              Wn -= D[k][i]*n[k]*n[j] - D[k][j]*n[k]*n[i];
-                            }
-                          n_dot[i] += Wn * n[j];
-                        }
-                    }
 
-                  // make sure that n is a unit vector. We have checked
-                  // above that n != 0.0.
-                  // handle time step 0 differently, because time step length is 0
-                  if (this->get_timestep() == 0)
-                    {
-                      n_dot = (n/n.norm())-n;
-                    }
-                  else
-                    {
-                      Tensor<1,dim> n_new = n + (n_dot * this->get_timestep());
-                      Assert (n_new.norm() != 0, ExcInternalError());
-                      n_new /= n_new.norm();
-                      n_dot = (n_new-n)/ this->get_timestep();
-                    }
-                }
-              else
-                {
-                  n_dot = 0;
-                }
-              // update  n[i] = in.composition[q][c_idx_n[i]] with adding to it n_dot*dt
-              for (unsigned int i=0; i<dim; ++i)
-                if (this->get_timestep() == 0)
-                  out.reaction_terms[q][c_idx_n[i]] = n_dot[i];
-                else
-                  out.reaction_terms[q][c_idx_n[i]] = n_dot[i] * this->get_timestep();
 
-              if (n.norm() > 0.5)
-                {
-                  n /= n.norm();
-                  SymmetricTensor<4,dim> Lambda;
-                  for (unsigned int i=0; i<dim; ++i)
-                    for (unsigned int j=0; j<dim; ++j)
-                      for (unsigned int k=0; k<dim; ++k)
-                        for (unsigned int l=0; l<dim; ++l)
-                          Lambda[i][j][k][l] = 1./2. * (n[i]*n[k]*delta(l,j)
-                                                        + n[j]*n[k]*delta(i,l)
-                                                        + n[i]*n[l]*delta(k,j)
-                                                        + n[j]*n[l]*delta(i,k))
-                                               - 2*n[i]*n[j]*n[k]*n[l];
-
+              
                   if (anisotropic_viscosity != nullptr)
                     {
                       // call helper function if you want
-                      // SymmetricTensor<...> tensor = internal::helper_function_name(... strain rate);
+                      SymmetricTensor<...> tensor = internal::helper_function_name(... strain rate);
 
                       anisotropic_viscosity->stress_strain_directors[q][0][0][0][0] = ... /// whatever the first component is
                       // ... define all other components (only one triangle)
