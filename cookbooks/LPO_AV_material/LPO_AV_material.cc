@@ -38,9 +38,10 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include <world_builder/utilities.h>
 
-#ifndef __aspect__av_material_h
-#define __aspect__av_material_h
+#ifndef __aspect__LPO_AV_material_h
+#define __aspect__LPO_AV_material_h
 
 #include <aspect/simulator_access.h>
 #include <aspect/simulator.h>
@@ -93,7 +94,7 @@ namespace aspect
          * This leaves the isotropic constitutive law unchanged if the material
          * model does not explicitly assign a value.
          */
-        std::vector<SymmetricTensor<4,dim>> stress_strain_directors;
+        std::vector<SymmetricTensor<4,dim> > stress_strain_directors;
     };
 
     namespace
@@ -109,7 +110,7 @@ namespace aspect
         for (unsigned int i = 0; i < Tensor<4,dim>::n_independent_components ; ++i)
           {
             TableIndices<4> indices(Tensor<4,dim>::unrolled_to_component_indices(i));
-            names.push_back("LPO_AV"+std::to_string(indices[0])+std::to_string(indices[1])+std::to_string(indices[2])+std::to_string(indices[3]));
+            names.push_back("anisotropic_viscosity"+std::to_string(indices[0])+std::to_string(indices[1])+std::to_string(indices[2])+std::to_string(indices[3]));
           }
         return names;
       }
@@ -195,7 +196,7 @@ namespace aspect
       internal::Assembly::CopyData::StokesPreconditioner<dim> &data = dynamic_cast<internal::Assembly::CopyData::StokesPreconditioner<dim>& > (data_base);
 
       const MaterialModel::AnisotropicViscosity<dim> *anisotropic_viscosity =
-        scratch.material_model_outputs.template get_additional_output<MaterialModel::AnisotropicViscosity<dim>>();
+        scratch.material_model_outputs.template get_additional_output<MaterialModel::AnisotropicViscosity<dim> >();
 
       const Introspection<dim> &introspection = this->introspection();
       const FiniteElement<dim> &fe = this->get_fe();
@@ -262,7 +263,7 @@ namespace aspect
     {
       const unsigned int n_points = outputs.viscosities.size();
 
-      if (outputs.template get_additional_output<MaterialModel::AnisotropicViscosity<dim>>() == nullptr)
+      if (outputs.template get_additional_output<MaterialModel::AnisotropicViscosity<dim> >() == nullptr)
         {
           outputs.additional_outputs.push_back(
             std_cxx14::make_unique<MaterialModel::AnisotropicViscosity<dim>> (n_points));
@@ -281,7 +282,7 @@ namespace aspect
       internal::Assembly::CopyData::StokesSystem<dim> &data = dynamic_cast<internal::Assembly::CopyData::StokesSystem<dim>& > (data_base);
 
       const MaterialModel::AnisotropicViscosity<dim> *anisotropic_viscosity =
-        scratch.material_model_outputs.template get_additional_output<MaterialModel::AnisotropicViscosity<dim>>();
+        scratch.material_model_outputs.template get_additional_output<MaterialModel::AnisotropicViscosity<dim> >();
 
       const Introspection<dim> &introspection = this->introspection();
       const FiniteElement<dim> &fe = this->get_fe();
@@ -290,7 +291,7 @@ namespace aspect
       const double pressure_scaling = this->get_pressure_scaling();
 
       const MaterialModel::AdditionalMaterialOutputsStokesRHS<dim>
-      *force = scratch.material_model_outputs.template get_additional_output<MaterialModel::AdditionalMaterialOutputsStokesRHS<dim>>();
+      *force = scratch.material_model_outputs.template get_additional_output<MaterialModel::AdditionalMaterialOutputsStokesRHS<dim> >();
 
       for (unsigned int q=0; q<n_q_points; ++q)
         {
@@ -361,21 +362,21 @@ namespace aspect
     {
       const unsigned int n_points = outputs.viscosities.size();
 
-      if (outputs.template get_additional_output<MaterialModel::AnisotropicViscosity<dim>>() == nullptr)
+      if (outputs.template get_additional_output<MaterialModel::AnisotropicViscosity<dim> >() == nullptr)
         {
           outputs.additional_outputs.push_back(
             std_cxx14::make_unique<MaterialModel::AnisotropicViscosity<dim>> (n_points));
         }
 
       if (this->get_parameters().enable_additional_stokes_rhs
-          && outputs.template get_additional_output<MaterialModel::AdditionalMaterialOutputsStokesRHS<dim>>() == nullptr)
+          && outputs.template get_additional_output<MaterialModel::AdditionalMaterialOutputsStokesRHS<dim> >() == nullptr)
         {
           outputs.additional_outputs.push_back(
             std_cxx14::make_unique<MaterialModel::AdditionalMaterialOutputsStokesRHS<dim>> (n_points));
         }
       Assert(!this->get_parameters().enable_additional_stokes_rhs
              ||
-             outputs.template get_additional_output<MaterialModel::AdditionalMaterialOutputsStokesRHS<dim>>()->rhs_u.size()
+             outputs.template get_additional_output<MaterialModel::AdditionalMaterialOutputsStokesRHS<dim> >()->rhs_u.size()
              == n_points, ExcInternalError());
     }
   }
@@ -421,10 +422,10 @@ namespace aspect
       // Some material models provide dislocation viscosities and boundary area work fractions
       // as additional material outputs. If they are attached, use them.
       const MaterialModel::DislocationViscosityOutputs<dim> *disl_viscosities_out =
-        material_model_outputs.template get_additional_output<MaterialModel::DislocationViscosityOutputs<dim>>();
+        material_model_outputs.template get_additional_output<MaterialModel::DislocationViscosityOutputs<dim> >();
 
       const MaterialModel::AnisotropicViscosity<dim> *anisotropic_viscosity =
-        material_model_outputs.template get_additional_output<MaterialModel::AnisotropicViscosity<dim>>();
+        material_model_outputs.template get_additional_output<MaterialModel::AnisotropicViscosity<dim> >();
 
       for (unsigned int q=0; q<heating_model_outputs.heating_source_terms.size(); ++q)
         {
@@ -475,7 +476,7 @@ namespace aspect
     {
       const unsigned int n_points = material_model_outputs.viscosities.size();
 
-      if (material_model_outputs.template get_additional_output<MaterialModel::AnisotropicViscosity<dim>>() == nullptr)
+      if (material_model_outputs.template get_additional_output<MaterialModel::AnisotropicViscosity<dim> >() == nullptr)
         {
           material_model_outputs.additional_outputs.push_back(
             std_cxx14::make_unique<MaterialModel::AnisotropicViscosity<dim>> (n_points));
@@ -527,13 +528,13 @@ namespace aspect
       for (unsigned int i=0; i<assemblers.stokes_preconditioner.size(); ++i)
         {
           if (Plugins::plugin_type_matches<Assemblers::StokesPreconditioner<dim>>(*(assemblers.stokes_preconditioner[i])))
-            assemblers.stokes_preconditioner[i] = std_cxx14::make_unique<Assemblers::StokesPreconditionerAnisotropicViscosity<dim>> ();
+            assemblers.stokes_preconditioner[i] = std_cxx14::make_unique<Assemblers::StokesPreconditionerAnisotropicViscosity<dim> > ();
         }
 
       for (unsigned int i=0; i<assemblers.stokes_system.size(); ++i)
         {
           if (Plugins::plugin_type_matches<Assemblers::StokesIncompressibleTerms<dim>>(*(assemblers.stokes_system[i])))
-            assemblers.stokes_system[i] = std_cxx14::make_unique<Assemblers::StokesIncompressibleTermsAnisotropicViscosity<dim>> ();
+            assemblers.stokes_system[i] = std_cxx14::make_unique<Assemblers::StokesIncompressibleTermsAnisotropicViscosity<dim> > ();
         }
     }
 
@@ -548,27 +549,79 @@ namespace aspect
                                                             std::cref(*this),
                                                             std::placeholders::_1,
                                                             std::placeholders::_2));
-      AssertThrow((dim==2),
-                  ExcMessage("For now the anisotropic viscosity assemblers work only in 2D"));
+      AssertThrow((dim==3),
+                  ExcMessage("Olivine has 3 independent slip systems, hence these models only work in 3D"));
 
     }
 
+    //If this is easier:
+    namespace internal
+    {
+      //grainsize - either input, or eventually need to get from particles grain volume fraction; 
+      //ALSO LATER - get directly the rotaion matrix from particles instead of euler angles. ?Updating euler angles?
+      template <int dim>
+      SymmetricTensor<2,3>
+      Stress_strain_aggregate(material_model_inputs.strain_rate,euler,material_model_inputs.temperature,grain_size)
+      {
+        double nFo = 4.1;
+        float A0 = 1.1e5*exp(-530000/8.314/material_model_inputs.temperature);
+        const FullMatrix<int> Schm(6,3); //Schmid tensor, 6x3 matrix
+        const FullMatrix<int> pinvschm(3,6); //pseudoinverse of Schmid tensor, 3x6 matrix
+        Tensor<3,1, double> A_ss; //A_ss is the invers of the minimum resolved stress on the slip systems on the nth power
+        A_ss(0) = 67.620068827798290;
+        A_ss(1) = 97.774775049471710;
+        A_ss(2) = 0.410143670706667;
+        Schm = 0;
+        Schm(4,3) = 1;
+        Schm(5,2) = 1;
+        Schm(6,1) = 1; //Is there an easier way to define this 6x3 and the following 3x6 matrices?
+        pinvschm = 0;
+        pinvschm(1,6) = 1;
+        pinvschm(2,5) = 1;
+        pinvschm(3,4) = 1;
+        for (int i = 0; i < euler.rows(); i++) {
+          Tensor<2,3, double> R = WorldBuilder::Utilities::euler_angles_to_rotation_matrix(euler[0],euler[1],euler[2]); //Rotation matrix
+          SymmetricTensor<2,3> Rate_grain=R*material_model_inputs.strain_rate*Transpose(R);
+          const std::array<std::pair<double,Tensor<1,3,double> >, 3> Rate_grain_eig = eigenvectors(Rate_grain, SymmetricTensorEigenvectorMethod::jacobi);
+		      double inv2=pow(Rate_grain_eig(0)-Rate_grain_eig(1),2)+pow(Rate_grain_eig(1)-Rate_grain_eig(2),2)+pow(Rate_grain_eig(0)-Rate_grain_eig(2),2);
+          Tensor<6,1, double> Rate_grain_voigt = { Rate_grain(0,0), Rate_grain(1,1), Rate_grain(2,2), 2*Rate_grain(1,2), 2*Rate_grain(0,2), 2*Rate_grain(0,1)};
+          Tensor<3,1, double> r_ss = pinvschm * Rate_grain_voigt;
+          Tensor<6,1, double> r_gc_v = Schm * r_ss;
+          SymmetricTensor<2,3> r_gc << r_gc_v(0),r_gc_v(5)/2,r_gc_v(4)/2,r_gc_v(5)/2,r_gc_v(1),r_gc_v(3)/2,r_gc_v(4)/2,r_gc_v(3)/2,r_gc_v(2);
+		      const std::array<std::pair<double,Tensor<1,3,double> >, 3> r_gc_eig = eigenvectors(r_gc, SymmetricTensorEigenvectorMethod::jacobi);
+		      double inv2best=pow(r_gc_eig(0)-r_gc_eig(1),2)+pow(r_gc_eig(1)-r_gc_eig(2),2)+pow(r_gc_eig(0)-r_gc_eig(2),2);
+		      r_ss=r_ss*pow(inv2/inv2best,0);
+		      Tensor<3,1, double> tau_ss;
+		      tau_ss(0)= copysign(1,r_ss(0))*pow(1/A_ss(0)*1/A0*pow(grain_size,0.73)*abs(r_ss(0)/2),1/nFo);
+		      tau_ss(1)= copysign(1,r_ss(1))*pow(1/A_ss(1)*1/A0*pow(grain_size,0.73)*abs(r_ss(1)/2),1/nFo);
+		      tau_ss(2)= copysign(1,r_ss(2))*pow(1/A_ss(2)*1/A0*pow(grain_size,0.73)*abs(r_ss(2)/2),1/nFo);
+		      Tensor<6,1, double> S_gc_v=Schm*tau_ss; //Voigt notation of the resolved stress on the grain
+		      SymmetricTensor<2,3> S_gc;
+	    	  S_gc << S_gc_v(0),S_gc_v(5),S_gc_v(4),S_gc_v(5),S_gc_v(1),S_gc_v(3),S_gc_v(4),S_gc_v(3),S_gc_v(2);
+		      SymmetricTensor<2,3> S_g=Rt*S_gc*R; //Here instead of making a multidimensional array what I sum at the end, I create S_g and add it to S_sum
+		      S_sum += S_g; 
+        }//end loop  for number of grains
+
+        return S_sum;
+      }
+    }
+    
 
 
-    template <int dim>
+    template <int dim> //this is what I have to change first!
     void
     AV<dim>::evaluate (const MaterialModel::MaterialModelInputs<dim> &in,
                        MaterialModel::MaterialModelOutputs<dim> &out) const
     {
       MaterialModel::AnisotropicViscosity<dim> *anisotropic_viscosity =
-        out.template get_additional_output<MaterialModel::AnisotropicViscosity<dim>>();
+        out.template get_additional_output<MaterialModel::AnisotropicViscosity<dim> >();
 
-      AssertThrow((this->introspection().compositional_name_exists("gamma")),
-                  ExcMessage("AV material model only works if there is a compositional field called gamma."));
-      AssertThrow(this->introspection().compositional_name_exists("ni"),
-                  ExcMessage("AV material model only works if there is a compositional field called ni."));
-      AssertThrow(this->introspection().compositional_name_exists("nj"),
-                  ExcMessage("AV material model only works if there is a compositional field called nj."));
+      AssertThrow((this->introspection().compositional_name_exists("euler1")),
+                  ExcMessage("AV material model only works if there is a compositional field called euler1 (first euler angle)."));
+      AssertThrow(this->introspection().compositional_name_exists("euler2"),
+                  ExcMessage("AV material model only works if there is a compositional field called euler2 (second euler angle)."));
+      AssertThrow(this->introspection().compositional_name_exists("euler3"),
+                  ExcMessage("AV material model only works if there is a compositional field called euler3 (third euler angle)."));
       if (dim == 3)
         AssertThrow(this->introspection().compositional_name_exists("nk"),
                     ExcMessage("AV material model only works if there is a compositional field called nk."));
@@ -583,10 +636,10 @@ namespace aspect
 
       // Get the grad_u tensor, at the center of this cell, if possible.
 
-      std::vector<Tensor<2,dim>> velocity_gradients (in.n_evaluation_points());
+      std::vector<Tensor<2,dim> > velocity_gradients (in.n_evaluation_points());
       if (in.current_cell.state() == IteratorState::valid)
         {
-          std::vector<Point<dim>> quadrature_positions(in.n_evaluation_points());
+          std::vector<Point<dim> > quadrature_positions(in.n_evaluation_points());
           for (unsigned int i=0; i < in.n_evaluation_points(); ++i)
             quadrature_positions[i] = this->get_mapping().transform_real_to_unit_cell(in.current_cell, in.position[i]);
 
@@ -614,9 +667,9 @@ namespace aspect
           for (unsigned int c=0; c<in.composition[q].size(); ++c)
             out.reaction_terms[q][c] = 0.0;
 
-          Tensor<1,dim> n;
+          Tensor<1,dim> euler;
           for (unsigned int i=0; i<dim; ++i)
-            n[i] = in.composition[q][c_idx_n[i]];
+            n[i] = in.composition[q][c_idx_euler[i]];
 
           // The computation of the viscosity tensor is only
           // necessary after the simulator has been initialized.
@@ -688,9 +741,16 @@ namespace aspect
 
                   if (anisotropic_viscosity != nullptr)
                     {
+                      // call helper function if you want
+                      // SymmetricTensor<...> tensor = internal::helper_function_name(... strain rate);
+
+                      anisotropic_viscosity->stress_strain_directors[q][0][0][0][0] = ... /// whatever the first component is
+                      // ... define all other components (only one triangle)
+
                       anisotropic_viscosity->stress_strain_directors[q] =dealii::identity_tensor<dim> ()
                                                                          - (1. - viscosity_ratio) * Lambda;
-                      SymmetricTensor<2,3> ViscoTensor;
+
+                      SymmetricTensor<2,6> ViscoTensor; // <= for a 6x6 matrix
                       ViscoTensor[0][0]=anisotropic_viscosity->stress_strain_directors[q][0][0][0][0];
                       ViscoTensor[0][1]=anisotropic_viscosity->stress_strain_directors[q][0][0][1][1];
                       ViscoTensor[0][2]=anisotropic_viscosity->stress_strain_directors[q][0][0][0][1] * std::sqrt(2);
@@ -759,7 +819,7 @@ namespace aspect
     {
       prm.enter_subsection("Material model");
       {
-        prm.enter_subsection("LPO_AV");
+        prm.enter_subsection("AV");
         {
           eta_N = prm.get_double("Normal viscosity");
           viscosity_ratio = prm.get_double("Shear viscosity")/eta_N;
@@ -777,7 +837,7 @@ namespace aspect
     {
       prm.enter_subsection("Material model");
       {
-        prm.enter_subsection("LPO_AV");
+        prm.enter_subsection("AV");
         {
           prm.declare_entry ("Normal viscosity", "1e-3",
                              Patterns::Double(),
@@ -797,7 +857,7 @@ namespace aspect
     void
     AV<dim>::create_additional_named_outputs(MaterialModel::MaterialModelOutputs<dim> &out) const
     {
-      if (out.template get_additional_output<AnisotropicViscosity<dim>>() == nullptr)
+      if (out.template get_additional_output<AnisotropicViscosity<dim> >() == nullptr)
         {
           const unsigned int n_points = out.n_evaluation_points();
           out.additional_outputs.push_back(
@@ -838,9 +898,9 @@ namespace aspect
 
   namespace MaterialModel
   {
-    ASPECT_REGISTER_MATERIAL_MODEL(LPO_AV,
-                                   "LPO_AV material",
-                                   "Material model for olivine LPO related anisotropic viscosity.")
+    ASPECT_REGISTER_MATERIAL_MODEL(AV,
+                                   "AV material",
+                                   "Transverse isotropic material model.")
   }
 }
 #endif

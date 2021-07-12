@@ -62,3 +62,13 @@
 
 .idea/
 cmake-build-debug/
+AspectConfigVersion.cmake
+CTestCustom.ctest
+print_test_info.sh
+world_builder_config.cc
+forinstall/AspectConfig.cmake
+include/aspect/config.h
+include/aspect/revision.h
+unit_tests/CTestTestfile.cmake
+unit_tests/Makefile
+unit_tests/setup_unit_tests.log
