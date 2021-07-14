@@ -40,9 +40,6 @@
 #include <vector>
 #include <world_builder/utilities.h>
 
-#ifndef __aspect__LPO_AV_material_h
-#define __aspect__LPO_AV_material_h
-
 #include <aspect/simulator_access.h>
 #include <aspect/simulator.h>
 #include <aspect/global.h>
@@ -60,6 +57,7 @@
 #include <aspect/simulator/assemblers/stokes.h>
 #include <aspect/simulator_signals.h>
 #include <aspect/postprocess/particles.h>
+#include <aspect/postprocess/particle_lpo.h>
 
 #include <deal.II/base/symmetric_tensor.h>
 #include <deal.II/base/signaling_nan.h>
@@ -559,63 +557,74 @@ namespace aspect
     //If this is easier:
     namespace internal
     {
+      template <int dim>
+      SymmetricTensor<2,dim>
+      Stress_strain_aggregate (SymmetricTensor<2,dim,double> rate,Tensor<1,dim,double> euler,double temperature,double grain_size)
+      {
+        Assert(false,ExcMessage("This material model is not implemented for 2D."));
+      }
+
       //grainsize - either input, or eventually need to get from particles grain volume fraction; 
       //ALSO LATER - get directly the rotaion matrix from particles instead of euler angles. ?Updating euler angles?
-      template <int dim>
+      template <>
       SymmetricTensor<2,3>
-      Stress_strain_aggregate(material_model_inputs.strain_rate,euler,material_model_inputs.temperature,grain_size)
+      Stress_strain_aggregate (SymmetricTensor<2,3,double> rate,Tensor<1,3,double> euler,double temperature,double grain_size)
       {
+        const unsigned int dim = 3;
+
         /*%Micromechanical model for olivine deformation by Hansen et al., (2016,
         %JGR) using a pseudo-Taylor method, assuming that each grain experiences
         %the same strain rate. It results in the best fitting stress in MPa.*/
 
         double nFo = 4.1;
-        float A0 = 1.1e5*exp(-530000/8.314/material_model_inputs.temperature);
-        const Tensor<6,3> Schm; //Schmid tensor, 6x3 matrix
-        const Tensor<3,6> pinvschm; //pseudoinverse of Schmid tensor, 3x6 matrix
-        Tensor<3,1, double> A_ss; //A_ss is the invers of the minimum resolved stress on the slip systems on the nth power
-        A_ss(0) = 67.620068827798290;
-        A_ss(1) = 97.774775049471710;
-        A_ss(2) = 0.410143670706667;
-        Schm [4][3] = 1;
+        float A0 = 1.1e5*exp(-530000/8.314/temperature);
+        Tensor<6,3> Schm; //Schmid tensor, 6x3 matrix
+        Tensor<3,6> pinvschm; //pseudoinverse of Schmid tensor, 3x6 matrix
+        Tensor<3,1> A_ss; //A_ss is the invers of the minimum resolved stress on the slip systems on the nth power
+        A_ss[0] = 67.620068827798290;
+        A_ss[1] = 97.774775049471710;
+        A_ss[2] = 0.410143670706667;
+        Schm[4][3] = 1;
         Schm[5][2] = 1;
-        Schm[6][1] = 1; //Is there an easier way to define this 6x3 and the following 3x6 matrices?
-        for (int i = 0; i < 3; i++) {
-          for (int j = 0; j < 6; i++) {
-            pinvschm[i][j] = 0;
-          }
-        }
-        pinvschm(1,6) = 1;
-        pinvschm(2,5) = 1;
-        pinvschm(3,4) = 1;
-        for (int i = 0; i < euler.rows(); i++) {
-          Tensor<2,3, double> R = WorldBuilder::Utilities::euler_angles_to_rotation_matrix(euler[0],euler[1],euler[2]); //Rotation matrix
-          SymmetricTensor<2,3> Rate_grain=R*material_model_inputs.strain_rate*Transpose(R);
-          const std::array<std::pair<double,Tensor<1,3,double> >, 3> Rate_grain_eig = eigenvectors(Rate_grain, SymmetricTensorEigenvectorMethod::jacobi);
-		      double inv2=pow(Rate_grain_eig(0)-Rate_grain_eig(1),2)+pow(Rate_grain_eig(1)-Rate_grain_eig(2),2)+pow(Rate_grain_eig(0)-Rate_grain_eig(2),2);
+        Schm[6][1] = 1; 
+        pinvschm[1][6] = 1;
+        pinvschm[2][5] = 1;
+        pinvschm[3][4] = 1;
+        //for (int i = 0; i < ngrains; i++) {
+          Tensor<2,3, double> R = WorldBuilder::Utilities::euler_angles_to_rotation_matrix(euler[0],euler[1],euler[2]); //Rotation matrix, Q: HOW DO I CALL IT PROPERLY FROM WORLDBUILDER OR FROM LPO.CC?
+          SymmetricTensor<2,3> Rate_grain=R*rate*transpose(R);
+          std::array<std::pair<double, Tensor<1, 3>>, 3> Rate_gr_eig = eigenvectors(Rate_grain,SymmetricTensorEigenvectorMethod::jacobi);
+		      double inv2=pow(Rate_gr_eig[0]-Rate_gr_eig[1],2)+pow(Rate_gr_eig[1]-Rate_gr_eig[2],2)+pow(Rate_gr_eig[0]-Rate_gr_eig[2],2);
           auto Rate_grain_voigt = AnisotropicViscosity<dim>::transform_Symmetric3x3_matrix_to_6D_vector(Rate_grain);
           
           Tensor<3,1, double> r_ss = pinvschm * Rate_grain_voigt;
           Tensor<6,1, double> r_gc_v = Schm * r_ss;
           auto r_gc = transform_6D_vector_to_Symmetric3x3_matrix(r_gc_v);
-		      const std::array<std::pair<double,Tensor<1,3,double> >, 3> r_gc_eig = eigenvectors(r_gc, SymmetricTensorEigenvectorMethod::jacobi);
-		      double inv2best=pow(r_gc_eig(0)-r_gc_eig(1),2)+pow(r_gc_eig(1)-r_gc_eig(2),2)+pow(r_gc_eig(0)-r_gc_eig(2),2);
+		      std::array<std::pair<double, Tensor<1, dim>>, dim> r_gc_eig = eigenvectors(r_gc, SymmetricTensorEigenvectorMethod::jacobi);
+
+          const double first_eigenvalue = r_gc_eig[0].first;
+          cont Tensor<1,dim> first_eigenvector = r_gc_eig[0].second;
+
+		      double inv2best=std::pow(r_gc_eig[0].first-r_gc_eig[1].first,2)
+            +std::pow(r_gc_eig[1].first-r_gc_eig[2].first,2)
+            +std::pow(r_gc_eig[0]-r_gc_eig[2],2);
+
 		      r_ss=r_ss*pow(inv2/inv2best,0);
 		      Tensor<3,1, double> tau_ss;
-		      tau_ss(0)= copysign(1,r_ss(0))*pow(1/A_ss(0)*1/A0*pow(grain_size,0.73)*abs(r_ss(0)/2),1/nFo);
-		      tau_ss(1)= copysign(1,r_ss(1))*pow(1/A_ss(1)*1/A0*pow(grain_size,0.73)*abs(r_ss(1)/2),1/nFo);
-		      tau_ss(2)= copysign(1,r_ss(2))*pow(1/A_ss(2)*1/A0*pow(grain_size,0.73)*abs(r_ss(2)/2),1/nFo);
-		      Tensor<6,1, double> S_gc_v=Schm*tau_ss; //Voigt notation of the resolved stress on the grain
-		      SymmetricTensor<2,3> S_gc;
-	    	  auto S_gc = transform_6D_vector_to_Symmetric3x3_matrix(S_gc_v);
+		      tau_ss[0]= std::copysign(1,r_ss[0])*std::pow(1/A_ss[0]*1/A0*std::pow(grain_size,0.73)*std::fabs(r_ss[0]/2),1/nFo);
+		      tau_ss[1]= std::copysign(1,r_ss[1])*std::pow(1/A_ss[1]*1/A0*std::pow(grain_size,0.73)*std::fabs(r_ss[1]/2),1/nFo);
+		      tau_ss[2]= std::copysign(1,r_ss[2])*std::pow(1/A_ss[2]*1/A0*std::pow(grain_size,0.73)*std::fabs(r_ss[2]/2),1/nFo);
+		      Tensor<1,6> S_gc_v=Schm*tau_ss; //Voigt notation of the resolved stress on the grain
+		      auto S_gc = transform_6D_vector_to_Symmetric3x3_matrix(S_gc_v);
 		      SymmetricTensor<2,3> S_g=Rt*S_gc*R; //Here instead of making a multidimensional array what I sum at the end, I create S_g and add it to S_sum
 		      S_sum += S_g; 
-        }//end loop  for number of grains
-        S_sum *= 10^6; //convert from MPa to Pa
+        //}//end loop  for number of grains
+        S_sum *= 1e6; //convert from MPa to Pa
 
         return S_sum;
       }
     }
+    
    namespace MaterialModel
   {
     template <int dim> //Where do I have to declare this function?
@@ -632,14 +641,14 @@ namespace aspect
     Tensor<1,6>
     AnisotropicViscosity<dim>::transform_Symmetric3x3_matrix_to_6D_vector(const SymmetricTensor<2,3> &input) 
     {
-      return Tensor<1,6,double> (
+      return Tensor<1,6> (
       {
         input[0][0],           // 0  // 1
         input[1][1],           // 1  // 2
         input[2][2],           // 2  // 3
-        sqrt(2)*input[1][2],   // 3  // 4
-        sqrt(2)*input[0][2],   // 4  // 5
-        sqrt(2)*input[0][1],   // 5  // 6
+        std::sqrt(2.0)*input[1][2],   // 3  // 4
+        std::sqrt(2.0)*input[0][2],   // 4  // 5
+        std::sqrt(2.0)*input[0][1],   // 5  // 6
       });
     }
 
@@ -649,7 +658,7 @@ namespace aspect
     {
       SymmetricTensor<2,3> result;
 
-      const double sqrt_2_inv = 1/sqrt(2);
+      const double sqrt_2_inv = 1/std::sqrt(2);
 
       result[0][0] = input[0];
       result[1][1] = input[1];
@@ -716,35 +725,91 @@ namespace aspect
             out.reaction_terms[q][c] = 0.0;
 
           Tensor<1,dim> euler;
-          for (unsigned int i=0; i<dim; ++i)
-            n[i] = in.composition[q][c_idx_euler[i]];
+          for (unsigned int i=0; i<dim; ++i){
+            euler[i] = in.composition[q][c_idx_euler[i]];}
 
           // The computation of the viscosity tensor is only
           // necessary after the simulator has been initialized.
           if (this->simulator_is_past_initialization())
             {
               //Second invariant of strain-rate
-              const double edot_ii = compute_second_invariant(strain_rate, min_strain_rate[c]);
+              const double edot_ii = compute_second_invariant(material_model_inputs.strain_rate, min_strain_rate[c]);
               //Define E tensor from Kiraly et al 2020 (G3) using edot_ii
+              SymmetricTensor<2,6> E;
               SymmetricTensor<2,5> E_reduced;
-              E_reduced[0][0]=edot_ii;
-              E_reduced[0][1]=-edot_ii/2;
-              E_reduced[1][0]=-edot_ii/2;
-              E_reduced[1][1]=edot_ii;
-              E_reduced[2][2]=edot_ii/std::sqrt(2);
-              E_reduced[3][3]=edot_ii/std::sqrt(2);
-              E_reduced[4][4]=edot_ii/std::sqrt(2);
+              Tensor<6,6 > S, S_power;
+              Tensor<5,5 > S_power_reduced;
+              E[0][0]=edot_ii;
+              E[0][1]=-edot_ii/2;
+              E[0][2]=-edot_ii/2;
+              E[1][0]=-edot_ii/2;
+              E[1][1]=edot_ii;
+              E[1][2]=-edot_ii/2;
+              E[2][0]=-edot_ii/2;
+              E[2][1]=-edot_ii/2;
+              E[2][2]=edot_ii;
+              E[3][3]=edot_ii/std::sqrt(2);
+              E[4][4]=edot_ii/std::sqrt(2);
+              E[5][5]=edot_ii/std::sqrt(2);
               //Create fluidity tensor 
-              for (int i = 0; i < 5; i++) { 
-                SymmetricTensor<2,3> rate;
+              for (int i = 0; i < 6; i++)
+               { 
+                SymmetricTensor<2,dim> rate = AnisotropicViscosity<dim>::transform_6D_vector_to_Symmetric3x3_matrix(E[i]);
+                SymmetricTensor<2,dim> S_stress = internal::Stress_strain_aggregagate(rate, euler, material_model_inputs.temperature,double grain_size);
+                const double S_stress_equivalent = std::sqrt(3*dealii::second_invariant(S_stress));//Von Mises equivalent stress using deal.ii second invariant
+                Tensor<1,6> S_stress_voigt = AnisotropicViscosity<dim>::transform_Symmetric3x3_matrix_to_6D_vector(S_stress);
+                for (int j = 0; j < 6; j++)
+                {
+                  S[j][i] = S_stress_voigt[j];
+                  S_power[j][i] = S_stress_voigt[j]*power(S_stress_equivalent,3.5-1)*power(3,(3.5-1)/2);
+                }
+              }
+              for (int i = 0; i < 5; i++)
+               {
+                for (int j = 0; j < 5; j++)
+                {
+                  E_reduced[i][j]=E[i+1][j+1];
+                  S_power_reduced[i][j]=S_power[i+1][j+1];
+                }
+              }
+              SymmetricTensor<2,6> ViscoTensor;
+              SymmetricTensor<2,5> ViscoTensor_reduced;
+              ViscoTensor_reduced = S_power_reduced * invert(E_reduced)); 
+              for (int i = 1; i < 6; i++)
+               {
+                for (int j = 1; j < 6; j++)
+                {
+                  ViscoTensor[i][j]=ViscoTensor_reduced[i-1][j-1]; //This is only the stress independent part of the viscosity
+                }
+              }
+              ViscoTensor[0][0] = S_power[0][0]/2*edot_ii + ViscoTensor[1][1]/4 + ViscoTensor[1][2]/2 + ViscoTensor[2][2]/4;
+              ViscoTensor[0][1] = S_power[1][0]/edot_ii + ViscoTensor[1][1]/2 + ViscoTensor[1][2]/2;
+              ViscoTensor[0][2] = S_power[2][0]/edot_ii + ViscoTensor[1][2]/2 + ViscoTensor[2][2]/2;
+              ViscoTensor[0][3] = std::sqrt(2)*S_power[0][3]/edot_ii ;
+              ViscoTensor[0][4] = std::sqrt(2)*S_power[0][4]/edot_ii ;
+              ViscoTensor[0][5] = std::sqrt(2)*S_power[0][5]/edot_ii ;
+
+              SymmetricTensor<2,dim> current_stress = internal::Stress_strain_aggregagate(material_model_inputs.strain_rate, euler, material_model_inputs.temperature, grain_size);
+              const double current_stress_equivalent = std::sqrt(3*dealii::second_invariant(S_stress));
+
+              // Overwrite the scalar viscosity with a better guess
+              out.viscosities[i] = 1 / (std::pow(current_stress_equivalent,3.5-1)*std::pow(3,(3.5-1)/2));
+              /*for (int i = 1; i < 6; i++)
+               {
+                for (int j = 1; j < 6; j++)
+                {
+                  ViscoTensor[i][j]=ViscoTensor_reduced[i][j] / (power(S_stress_equivalent,3.5-1)*power(3,(3.5-1)/2)); 
+                }
+              }*/
 
 
 
-              
+
+
                   if (anisotropic_viscosity != nullptr)
                     {
                       // call helper function if you want
-                      SymmetricTensor<...> tensor = internal::helper_function_name(... strain rate);
+                      //SymmetricTensor<...> tensor = internal::helper_function_name(... strain rate);
 
                       anisotropic_viscosity->stress_strain_directors[q][0][0][0][0] = ... /// whatever the first component is
                       // ... define all other components (only one triangle)
@@ -905,4 +970,3 @@ namespace aspect
                                    "Transverse isotropic material model.")
   }
 }
-#endif
