@@ -64,6 +64,7 @@ namespace aspect
                                     const std::vector<Tensor<1,dim> > &gradients,
                                     typename ParticleHandler<dim>::particle_iterator &particle) const override;
 
+
           /**
            * This implementation tells the particle manager that
            * we need to update particle properties over time.

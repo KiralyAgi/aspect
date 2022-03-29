@@ -33,20 +33,20 @@ namespace aspect
       Strainrate<dim>::initialize_one_particle_property(const Point<dim> &,
                                                       std::vector<double> &data) const
       {
-        for (unsigned int i = 0; i < dim; ++i)
-          data.push_back(0.0);
+       const static Tensor<2,dim> identity = unit_symmetric_tensor<dim>();
+       for (unsigned int i = 0; i < Tensor<2,dim>::n_independent_components ; ++i) 
+          data.push_back(identity[Tensor<2,dim>::unrolled_to_component_indices(i)]);
+        
       }
 
       template <int dim>
       void
       Strainrate<dim>::update_particle_property(const unsigned int data_position,
-                                              const Vector<double> &/*solution*/,
-                                              const std::vector<Tensor<1,dim> > &gradients,
-                                              typename ParticleHandler<dim>::particle_iterator &particle) const
+                                                      const Vector<double> &/*solution*/,
+                                                      const std::vector<Tensor<1,dim> > &gradients,
+                                                      typename ParticleHandler<dim>::particle_iterator &particle) const
       {
-        
-
-
+        auto &data = particle->get_properties();
         // Velocity gradients
         Tensor<2,dim> grad_u;
         for (unsigned int d=0; d<dim; ++d)
@@ -54,47 +54,33 @@ namespace aspect
 
         // Calculate strain rate from velocity gradients
         const SymmetricTensor<2,dim> strain_rate = symmetrize (grad_u);
-        std::vector<double> strain_rate_voigt;
-        if (dim==2)
-        {
-            strain_rate_voigt[0]=strain_rate[0][0];
-            strain_rate_voigt[1]=strain_rate[1][1];
-            strain_rate_voigt[2]=2*strain_rate[0][1];
-        }
-        else
-        {
-            strain_rate_voigt[0]=strain_rate[0][0];
-            strain_rate_voigt[1]=strain_rate[1][1];
-            strain_rate_voigt[2]=strain_rate[2][2];
-            strain_rate_voigt[3]=2*strain_rate[1][2];
-            strain_rate_voigt[4]=2*strain_rate[0][2];
-            strain_rate_voigt[5]=2*strain_rate[0][1];
-        }
-        for (unsigned int i = 0; i < 2*dim; ++i)
-          particle->get_properties()[data_position+i] = strain_rate_voigt[i];
 
+        for (unsigned int i = 0; i < Tensor<2,dim>::n_independent_components ; ++i) 
+          data[data_position + i] = strain_rate[Tensor<2,dim>::unrolled_to_component_indices(i)];
         
+       
       }
 
       template <int dim>
       UpdateTimeFlags
       Strainrate<dim>::need_update() const
       {
-        return update_output_step;
+        return update_time_step;
       }
 
       template <int dim>
       UpdateFlags
       Strainrate<dim>::get_needed_update_flags () const
       {
-        return update_values;
+        return update_gradients;
       }
 
       template <int dim>
       std::vector<std::pair<std::string, unsigned int> >
       Strainrate<dim>::get_property_information() const
       {
-        const std::vector<std::pair<std::string,unsigned int> > property_information (1,std::make_pair("strainrate",dim));
+        const unsigned int n_components = Tensor<2,dim>::n_independent_components;
+        const std::vector<std::pair<std::string,unsigned int> > property_information (1,std::make_pair("strainrate",n_components));
         return property_information;
       }
     }
@@ -111,7 +97,7 @@ namespace aspect
       ASPECT_REGISTER_PARTICLE_PROPERTY(Strainrate,
                                         "strainrate",
                                         "Implementation of a plugin in which the particle "
-                                        "property is defined as the recent strainrate (in Voigt notation) at "
+                                        "property is defined as the recent strainrate at "
                                         "this position.")
     }
   }
