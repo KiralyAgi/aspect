@@ -51,9 +51,10 @@ namespace aspect
         Tensor<2,dim> grad_u;
         for (unsigned int d=0; d<dim; ++d)
           grad_u[d] = gradients[d];
-
+        //std::cout<<"grad_u: "<<grad_u<<std::endl;
         // Calculate strain rate from velocity gradients
         const SymmetricTensor<2,dim> strain_rate = symmetrize (grad_u);
+        //std::cout<<"strainrate: "<<strain_rate<<std::endl;
 
         for (unsigned int i = 0; i < Tensor<2,dim>::n_independent_components ; ++i) 
           data[data_position + i] = strain_rate[Tensor<2,dim>::unrolled_to_component_indices(i)];
