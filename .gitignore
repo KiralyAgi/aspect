@@ -24,6 +24,7 @@
 /benchmarks/tangurnis/*/*csv
 /benchmarks/tangurnis/*/solution*
 /build*/
+/prmfiles*/
 /cmake_install.cmake
 /cookbooks/**/*.prm.out
 /cookbooks/**/lib*.so
@@ -63,6 +64,7 @@
 
 .idea/
 cmake-build-debug/
+<<<<<<< HEAD
 prmfiles/convection_box_3d_AV_pre.prm
 prmfiles/shearbox_test_LPOAV/log_density1.txt
 prmfiles/shearbox_test_LPOAV/log.txt
@@ -111,6 +113,8 @@ prmfiles/shearbox_test_LPOAV_onMaster/solution/solution-00001.pvtu
 prmfiles/shearbox_test_LPOAV_onMaster/solution/solution-00001.visit
 prmfiles/shearbox_test_LPOAV_density0/log.txt
 prmfiles/shearbox_test_LPO_AV_pre.prm
+=======
+>>>>>>> FratersBillen21_mac_Strainrate_save_on_Particle
 prmfiles/shearbox_test_AV_0_0_0_onAVbranch/log.txt
 prmfiles/shearbox_test_AV_0_0_0_onAVbranch/original.prm
 prmfiles/shearbox_test_AV_0_0_0_onAVbranch/parameters.json
@@ -182,6 +186,48 @@ prmfiles/shearbox_test_AV_90_0_0_onAVbranch/statistics
 prmfiles/shearbox_test_AV_90_0_0_onAVbranch/solution/solution-00000.0000.vtu
 prmfiles/shearbox_test_AV_90_0_0_onAVbranch/solution/solution-00000.pvtu
 prmfiles/shearbox_test_AV_90_0_0_onAVbranch/solution/solution-00000.visit
+<<<<<<< HEAD
+=======
+prmfiles/shearbox_test_LPOAV/log_density1.txt
+prmfiles/shearbox_test_LPOAV/solution.pvd
+prmfiles/shearbox_test_LPOAV/solution.visit
+prmfiles/shearbox_test_LPOAV/solver_history.txt
+prmfiles/shearbox_test_LPOAV/statistics
+prmfiles/shearbox_test_LPOAV/solution/solution-00000.0000.vtu
+prmfiles/shearbox_test_LPOAV/solution/solution-00000.pvtu
+prmfiles/shearbox_test_LPOAV/solution/solution-00000.visit
+prmfiles/shearbox_test_LPOAV/solution/solution-00001.0000.vtu
+prmfiles/shearbox_test_LPOAV/solution/solution-00001.pvtu
+prmfiles/shearbox_test_LPOAV/solution/solution-00001.visit
+prmfiles/shearbox_test_LPOAV_density0/logdensity0.txt
+prmfiles/shearbox_test_LPOAV_density0/original.prm
+prmfiles/shearbox_test_LPOAV_density0/parameters.json
+prmfiles/shearbox_test_LPOAV_density0/parameters.prm
+prmfiles/shearbox_test_LPOAV_density0/parameters.tex
+prmfiles/shearbox_test_LPOAV_density0/solution.pvd
+prmfiles/shearbox_test_LPOAV_density0/solution.visit
+prmfiles/shearbox_test_LPOAV_density0/statistics
+prmfiles/shearbox_test_LPOAV_density0/solution/solution-00000.0000.vtu
+prmfiles/shearbox_test_LPOAV_density0/solution/solution-00000.pvtu
+prmfiles/shearbox_test_LPOAV_density0/solution/solution-00000.visit
+prmfiles/shearbox_test_LPOAV_density0/solution/solution-00001.0000.vtu
+prmfiles/shearbox_test_LPOAV_density0/solution/solution-00001.pvtu
+prmfiles/shearbox_test_LPOAV_density0/solution/solution-00001.visit
+prmfiles/shearbox_test_LPOAV_onMaster/log.txt
+prmfiles/shearbox_test_LPOAV_onMaster/original.prm
+prmfiles/shearbox_test_LPOAV_onMaster/parameters.json
+prmfiles/shearbox_test_LPOAV_onMaster/parameters.prm
+prmfiles/shearbox_test_LPOAV_onMaster/parameters.tex
+prmfiles/shearbox_test_LPOAV_onMaster/solution.pvd
+prmfiles/shearbox_test_LPOAV_onMaster/solution.visit
+prmfiles/shearbox_test_LPOAV_onMaster/statistics
+prmfiles/shearbox_test_LPOAV_onMaster/solution/solution-00000.0000.vtu
+prmfiles/shearbox_test_LPOAV_onMaster/solution/solution-00000.pvtu
+prmfiles/shearbox_test_LPOAV_onMaster/solution/solution-00000.visit
+prmfiles/shearbox_test_LPOAV_onMaster/solution/solution-00001.0000.vtu
+prmfiles/shearbox_test_LPOAV_onMaster/solution/solution-00001.pvtu
+prmfiles/shearbox_test_LPOAV_onMaster/solution/solution-00001.visit
+>>>>>>> FratersBillen21_mac_Strainrate_save_on_Particle
 prmfiles/shearbox_test_noAV_onAVbranch/log.txt
 prmfiles/shearbox_test_noAV_onAVbranch/original.prm
 prmfiles/shearbox_test_noAV_onAVbranch/parameters.json
