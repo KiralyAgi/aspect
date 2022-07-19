@@ -639,8 +639,8 @@ namespace aspect
       if (theta != 0.0 && theta != dealii::numbers::PI)
         {
           //
-          phi1  = std::atan2(rotation_matrix[2][0]/-sin(theta),rotation_matrix[2][1]/-sin(theta));
-          phi2  = std::atan2(rotation_matrix[0][2]/-sin(theta),rotation_matrix[1][2]/sin(theta));
+          phi1  = std::atan2(rotation_matrix[2][0]/sin(theta),rotation_matrix[2][1]/-sin(theta));
+          phi2  = std::atan2(rotation_matrix[0][2]/sin(theta),rotation_matrix[1][2]/sin(theta));
         }
       else
         {
@@ -650,7 +650,7 @@ namespace aspect
           // (cosine matrix) should be the same.
           if (theta == 0.0)
             {
-              phi2 = - phi1 - std::atan2(rotation_matrix[0][1],rotation_matrix[0][0]);
+              phi2 = - phi1 - std::atan2(-rotation_matrix[0][1],rotation_matrix[0][0]);
             }
           else
             {
