@@ -807,13 +807,8 @@ namespace aspect
         = out.template get_additional_output<MaterialModel::AV<dim>>();
       EquationOfStateOutputs<dim> eos_outputs (1);
 
-      //Get prescribed field nmes
-      std::vector<std::string> ssd_names;
-      for (unsigned int i = 0; i < SymmetricTensor<4,dim>::n_independent_components ; ++i)
-        { 
-          ssd_names.push_back("ssd"+std::to_string(i+1));
-        }
-      
+
+
       for (unsigned int q=0; q<in.n_evaluation_points(); ++q)
         {
           // std::cout << "Evaluation point: " << q << std::endl;
@@ -1040,9 +1035,19 @@ namespace aspect
                   if (anisotropic_viscosity != nullptr)
                     {
                       anisotropic_viscosity->stress_strain_directors[q] = V_r4;
-                    }    
+                    } 
 
                   double scalar_viscosity = composition[ind_vis];
+                
+                  //In first time step using input viscosity can lead to convergence issue if the strainrate varies significantly within the model domain. 
+                  //Thus for the first timestep we calculate an intial viscosity based on the strain rate. Why not later: seems to cause unstable solution(?)
+                  if (this->get_timestep_number() == 1)
+                    {
+                      const double edot_ii=std::max(std::sqrt(std::max(-second_invariant(deviator(strain_rate)), 0.)),
+                                            min_strain_rate);
+                      scalar_viscosity= 1/Gamma *  std::pow(edot_ii,((1. - n)/n));
+                    }
+
                   double n_iterations = 1;
                   double max_iteration = 100;
                   double residual = scalar_viscosity;
@@ -1078,6 +1083,7 @@ namespace aspect
                     double scalar_viscosity_new = (1 / (Gamma * std::pow(Jhill,(n-1)/2))) * 1e6; // convert from MPa to Pa                                
                     residual = std::abs(scalar_viscosity_new - scalar_viscosity);
                     scalar_viscosity = scalar_viscosity_new;
+                    threshold = 0.001*scalar_viscosity;
                     // std::cout << "scalar_viscosity in loop: " << scalar_viscosity <<std::endl;
                     // std::cout << "residual: " << residual <<std::endl;
                     n_iterations += 1;
@@ -1092,7 +1098,7 @@ namespace aspect
                   }
                   //Overwrite the scalar viscosity with an effective viscosity
                   out.viscosities[q] = scalar_viscosity;//composition[ind_vis];//
-                  // std::cout << "Final scalar_viscosity: " << scalar_viscosity <<std::endl;
+                  //std::cout << "Final scalar_viscosity: " << scalar_viscosity <<std::endl;
                   
                   AssertThrow(out.viscosities[q] > 0,
                               ExcMessage("Viscosity should be positive"));
@@ -1130,13 +1136,13 @@ namespace aspect
                   SymmetricTensor<4,dim> V_r4;
                   dealii::Physics::Notation::Kelvin::to_tensor(V_mat, V_r4);
                   anisotropic_viscosity->stress_strain_directors[q] = V_r4;
-                  // anisotropic_viscosity->stress_strain_directors[q] = dealii::identity_tensor<dim> ();
+                  
                 }
             }
           // Prescribe the stress strain directors and scalar viscosity to compositional field for access in the next time step
           if (PrescribedFieldOutputs<dim> *prescribed_field_out = out.template get_additional_output<PrescribedFieldOutputs<dim>>())
             {
-            std::vector<double> ViscoTensor_array(SymmetricTensor<4,dim>::n_independent_components);
+            //std::vector<double> ViscoTensor_array(SymmetricTensor<4,dim>::n_independent_components);
             // FullMatrix<double> V_mat = dealii::Physics::Notation::Kelvin::to_matrix(anisotropic_viscosity->stress_strain_directors[q]);
             // SymmetricTensor<2,6> V_r2;
             // for (unsigned int vi=0; vi<6; ++vi)
@@ -1161,7 +1167,7 @@ namespace aspect
             //     std::cout << VT_a_item << ' ';
             // std::cout << std::endl;
             // std::cout << "Saved ssd: " << anisotropic_viscosity->stress_strain_directors[q] << std::endl;
-            // std::cout << "Saved viscosity: " << out.viscosities[q] << std::endl;
+            //std::cout << "Saved viscosity: " << out.viscosities[q] << std::endl;
             }
         }
     }
